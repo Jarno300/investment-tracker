@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16
+    container_name: investment-tracker-db
+    environment:
+      POSTGRES_USER: investment
+      POSTGRES_PASSWORD: investment
+      POSTGRES_DB: investment_tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: investment-tracker-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/investment_tracker
+      SPRING_DATASOURCE_USERNAME: investment
+      SPRING_DATASOURCE_PASSWORD: investment
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET}
+      STOCK_API_KEY: ${STOCK_API_KEY}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: investment-tracker-frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # preserve container node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

@@ -1,0 +1,24 @@
+.auth-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.field input {
+  background: #0f141c;
+  border: 1px solid #1f2633;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #eef2f6;
+}

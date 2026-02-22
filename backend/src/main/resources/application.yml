@@ -1,0 +1,28 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: investment-tracker
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/investment_tracker}
+    username: ${SPRING_DATASOURCE_USERNAME:investment}
+    password: ${SPRING_DATASOURCE_PASSWORD:investment}
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:change-this-secret-to-32-chars-min}
+      access-token-seconds: ${JWT_ACCESS_TTL:900}
+      refresh-token-seconds: ${JWT_REFRESH_TTL:2592000}
+  stock:
+    api-key: ${STOCK_API_KEY:}
+    base-url: ${STOCK_API_BASE_URL:https://www.alphavantage.co/query}
