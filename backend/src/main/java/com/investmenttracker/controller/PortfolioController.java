@@ -1,6 +1,7 @@
 package com.investmenttracker.controller;
 
 import com.investmenttracker.dto.BuyRequest;
+import com.investmenttracker.dto.SellRequest;
 import com.investmenttracker.model.Asset;
 import com.investmenttracker.model.AssetType;
 import com.investmenttracker.model.Holding;
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,6 +54,9 @@ public class PortfolioController {
     if (request.quantity().compareTo(BigDecimal.ZERO) <= 0 || request.price().compareTo(BigDecimal.ZERO) <= 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quantity and price must be greater than zero");
     }
+    if (request.costs() != null && request.costs().compareTo(BigDecimal.ZERO) < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Costs cannot be negative");
+    }
 
     Asset asset = assetRepository.findByUserIdAndTypeAndSymbolIgnoreCase(
             user.getId(), AssetType.STOCK, request.symbol().trim())
@@ -80,7 +85,10 @@ public class PortfolioController {
     BigDecimal oldQty = holding.getQuantity() == null ? BigDecimal.ZERO : holding.getQuantity();
     BigDecimal newQty = oldQty.add(request.quantity());
     BigDecimal oldAvg = holding.getAverageCost() == null ? BigDecimal.ZERO : holding.getAverageCost();
-    BigDecimal totalCost = oldAvg.multiply(oldQty).add(request.price().multiply(request.quantity()));
+    BigDecimal tradeCosts = defaultValue(request.costs());
+    BigDecimal totalCost = oldAvg.multiply(oldQty)
+        .add(request.price().multiply(request.quantity()))
+        .add(tradeCosts);
     BigDecimal newAvg = totalCost.divide(newQty, 6, RoundingMode.HALF_UP);
 
     holding.setQuantity(newQty);
@@ -95,13 +103,62 @@ public class PortfolioController {
     transaction.setType(TransactionType.BUY);
     transaction.setQuantity(request.quantity());
     transaction.setPrice(request.price());
+    transaction.setCosts(tradeCosts);
     transaction.setTradedAt(request.tradedAt() == null ? Instant.now() : request.tradedAt());
     transactionRepository.save(transaction);
 
     return savedHolding;
   }
 
+  @PostMapping("/sell")
+  public ResponseEntity<Void> sell(@RequestBody SellRequest request) {
+    UserAccount user = currentUserService.getRequiredUser();
+    if (request == null || request.holdingId() == null || request.quantity() == null || request.price() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "holdingId, quantity and price are required");
+    }
+    if (request.quantity().compareTo(BigDecimal.ZERO) <= 0 || request.price().compareTo(BigDecimal.ZERO) <= 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quantity and price must be greater than zero");
+    }
+    if (request.costs() != null && request.costs().compareTo(BigDecimal.ZERO) < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Costs cannot be negative");
+    }
+
+    Holding holding = holdingRepository.findByIdAndUserId(request.holdingId(), user.getId())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holding not found"));
+    BigDecimal ownedQuantity = holding.getQuantity() == null ? BigDecimal.ZERO : holding.getQuantity();
+    if (request.quantity().compareTo(ownedQuantity) > 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sell quantity cannot exceed owned quantity");
+    }
+
+    BigDecimal remainingQuantity = ownedQuantity.subtract(request.quantity());
+    if (remainingQuantity.compareTo(BigDecimal.ZERO) == 0) {
+      holdingRepository.delete(holding);
+    } else {
+      holding.setQuantity(remainingQuantity);
+      BigDecimal averageCost = holding.getAverageCost() == null ? BigDecimal.ZERO : holding.getAverageCost();
+      holding.setMarketValue(remainingQuantity.multiply(averageCost));
+      holding.setUpdatedAt(Instant.now());
+      holdingRepository.save(holding);
+    }
+
+    Transaction transaction = new Transaction();
+    transaction.setUser(user);
+    transaction.setAsset(holding.getAsset());
+    transaction.setType(TransactionType.SELL);
+    transaction.setQuantity(request.quantity());
+    transaction.setPrice(request.price());
+    transaction.setCosts(defaultValue(request.costs()));
+    transaction.setTradedAt(request.tradedAt() == null ? Instant.now() : request.tradedAt());
+    transactionRepository.save(transaction);
+
+    return ResponseEntity.noContent().build();
+  }
+
   private boolean isBlank(String value) {
     return value == null || value.trim().isEmpty();
+  }
+
+  private BigDecimal defaultValue(BigDecimal value) {
+    return value == null ? BigDecimal.ZERO : value;
   }
 }

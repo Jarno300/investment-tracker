@@ -1,46 +1,88 @@
 <template>
-  <main class="page">
-    <AppHeader
-      :user="user"
-      :error="error"
-      :loading="loading"
-      :is-authenticated="isAuthenticated"
-      :auth-mode="authMode"
-      @toggle-auth-mode="toggleAuthMode"
-      @logout="logout"
-      @add-asset="openAddAsset"
-    />
+  <div class="app-shell">
+    <aside v-if="isAuthenticated" class="sidebar">
+      <button
+        type="button"
+        class="nav-button"
+        :class="{ active: viewMode === 'dashboard' }"
+        @click="viewMode = 'dashboard'"
+      >
+        Dashboard
+      </button>
+      <button
+        type="button"
+        class="nav-button"
+        :class="{ active: viewMode === 'holdings' }"
+        @click="viewMode = 'holdings'"
+      >
+        Holdings
+      </button>
+    </aside>
 
-    <AuthPanel
-      v-if="!isAuthenticated"
-      v-model:email="authEmail"
-      v-model:password="authPassword"
-      :auth-mode="authMode"
-      :auth-error="authError"
-      @submit="handleAuth"
-    />
+    <main class="page">
+      <AppHeader
+        :user="user"
+        :error="error"
+        :loading="loading"
+        :is-authenticated="isAuthenticated"
+        :auth-mode="authMode"
+        @toggle-auth-mode="toggleAuthMode"
+        @logout="logout"
+        @add-asset="openAddAsset"
+      />
 
-    <SummaryCards
-      v-if="isAuthenticated"
-      :summary="summary"
-      :total-value="totalValueDisplay"
-      :asset-type-breakdown="assetTypeBreakdown"
-      :holdings="holdings"
-      :format-type="formatType"
-    />
+      <AuthPanel
+        v-if="!isAuthenticated"
+        v-model:email="authEmail"
+        v-model:password="authPassword"
+        :auth-mode="authMode"
+        :auth-error="authError"
+        @submit="handleAuth"
+      />
 
-    <section v-if="isAuthenticated" class="grid">
-      <AssetTypePanel :items="assetTypeBreakdown" :format-type="formatType" />
-      <HoldingsPanel :holdings="holdings" :format-currency="formatCurrency" />
-      <ActivityPanel :transactions="transactions" :format-date="formatDate" />
-    </section>
+      <SummaryCards
+        v-if="isAuthenticated && viewMode === 'dashboard'"
+        :summary="summary"
+        :total-value="totalValueDisplay"
+        :asset-type-breakdown="assetTypeBreakdown"
+        :holdings="holdings"
+        :format-type="formatType"
+      />
 
-    <AddAssetModal
-      :open="showAddAsset"
-      @close="closeAddAsset"
-      @added="handleAssetAdded"
-    />
-  </main>
+      <section v-if="isAuthenticated && viewMode === 'dashboard'" class="grid">
+        <AssetTypePanel :items="assetTypeBreakdown" :format-type="formatType" />
+        <HoldingsPanel
+          :holdings="holdings"
+          :format-currency="formatCurrency"
+          @sell="openSellModal"
+        />
+        <ActivityPanel :transactions="transactions" :format-date="formatDate" />
+      </section>
+
+      <section
+        v-if="isAuthenticated && viewMode === 'holdings'"
+        class="holdings-focus"
+      >
+        <HoldingsPanel
+          :holdings="holdings"
+          :format-currency="formatCurrency"
+          @sell="openSellModal"
+        />
+      </section>
+
+      <AddAssetModal
+        :open="showAddAsset"
+        @close="closeAddAsset"
+        @added="handleAssetAdded"
+      />
+      <SellHoldingModal
+        :open="showSellModal"
+        :holding="selectedHolding"
+        @close="closeSellModal"
+        @sold="handleHoldingSold"
+      />
+    </main>
+  </div>
 </template>
 
 <script setup>
@@ -51,6 +93,7 @@ import AppHeader from "./components/AppHeader.vue";
 import AssetTypePanel from "./components/AssetTypePanel.vue";
 import AuthPanel from "./components/AuthPanel.vue";
 import HoldingsPanel from "./components/HoldingsPanel.vue";
+import SellHoldingModal from "./components/SellHoldingModal.vue";
 import SummaryCards from "./components/SummaryCards.vue";
 import {
   apiFetch,
@@ -76,7 +119,10 @@ const authError = ref("");
 
 const accessToken = ref(getAccessToken());
 const isAuthenticated = computed(() => Boolean(accessToken.value));
+const viewMode = ref("dashboard");
 const showAddAsset = ref(false);
+const showSellModal = ref(false);
+const selectedHolding = ref(null);
 
 const totalValueDisplay = computed(() =>
   formatCurrency(summary.value.totalValue),
@@ -113,6 +159,9 @@ async function loadDashboard() {
     holdings.value = holdingsData;
     transactions.value = transactionsData.slice(0, 5);
   } catch (err) {
+    if (err.status === 401) {
+      logout();
+    }
     error.value = err.message || "Failed to load dashboard data.";
   } finally {
     loading.value = false;
@@ -144,11 +193,14 @@ function toggleAuthMode() {
 function logout() {
   clearTokens();
   accessToken.value = "";
+  viewMode.value = "dashboard";
   user.value = null;
   summary.value = { totalValue: 0, holdingsCount: 0, assetsCount: 0 };
   assets.value = [];
   holdings.value = [];
   transactions.value = [];
+  showSellModal.value = false;
+  selectedHolding.value = null;
 }
 
 function openAddAsset() {
@@ -163,10 +215,26 @@ async function handleAssetAdded() {
   await loadDashboard();
 }
 
+function openSellModal(holding) {
+  selectedHolding.value = holding;
+  showSellModal.value = true;
+}
+
+function closeSellModal() {
+  showSellModal.value = false;
+  selectedHolding.value = null;
+}
+
+async function handleHoldingSold() {
+  await loadDashboard();
+}
+
 async function fetchJson(path) {
   const response = await apiFetch(path);
   if (!response.ok) {
-    throw new Error(`Request failed for ${path}`);
+    const err = new Error(`Request failed for ${path}`);
+    err.status = response.status;
+    throw err;
   }
   return response.json();
 }
@@ -198,3 +266,47 @@ function formatDate(value) {
   });
 }
 </script>
+
+<style scoped>
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.page {
+  flex: 1;
+}
+
+.sidebar {
+  width: 200px;
+  border-right: 1px solid #1f2633;
+  background: #0f141c;
+  padding: 24px 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.nav-button {
+  background: #151a22;
+  border: 1px solid #1f2633;
+  color: #eef2f6;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nav-button.active {
+  border-color: #4f46e5;
+  background: rgba(79, 70, 229, 0.18);
+}
+
+.holdings-focus {
+  display: block;
+}
+</style>

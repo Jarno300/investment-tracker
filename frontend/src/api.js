@@ -42,6 +42,40 @@ export async function searchStocks(query) {
   return response.json();
 }
 
+const STOCK_QUOTE_CACHE_PREFIX = "stock_quote_";
+const STOCK_QUOTE_CACHE_MS = 24 * 60 * 60 * 1000; // 1 day
+
+export async function getStockQuote(symbol) {
+  const cacheKey = `${STOCK_QUOTE_CACHE_PREFIX}${symbol.toUpperCase()}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const { data, fetchedAt } = JSON.parse(cached);
+      const hasValidPrice = data?.price != null && !Number.isNaN(Number(data.price));
+      if (Date.now() - fetchedAt < STOCK_QUOTE_CACHE_MS && hasValidPrice) {
+        return data;
+      }
+    } catch {
+      // invalid cache, fetch fresh
+    }
+  }
+
+  const response = await apiFetch(
+    `/api/stocks/quote?symbol=${encodeURIComponent(symbol)}`
+  );
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    const message = await readErrorMessage(response);
+    throw new Error(message || "Failed to fetch quote");
+  }
+  const data = await response.json();
+  localStorage.setItem(
+    cacheKey,
+    JSON.stringify({ data, fetchedAt: Date.now() })
+  );
+  return data;
+}
+
 export async function buyStock(payload) {
   const response = await apiFetch("/api/portfolio/buy", {
     method: "POST",
@@ -52,6 +86,17 @@ export async function buyStock(payload) {
     throw new Error(message);
   }
   return response.json();
+}
+
+export async function sellHolding(payload) {
+  const response = await apiFetch("/api/portfolio/sell", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const message = await readApiErrorMessage(response);
+    throw new Error(message || "Failed to sell holding");
+  }
 }
 
 async function authRequest(path, payload) {
@@ -90,7 +135,7 @@ async function readErrorMessage(response) {
   }
 
   if (response.status === 401) {
-    return "Invalid email or password.";
+    return "Session expired. Please log in again.";
   }
   if (response.status === 409) {
     return "Email already registered.";
@@ -99,6 +144,26 @@ async function readErrorMessage(response) {
     return "Email and password are required.";
   }
   return "Authentication failed. Please try again.";
+}
+
+async function readApiErrorMessage(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      const data = await response.json();
+      if (data?.message) return data.message;
+      if (data?.error) return data.error;
+    } catch {
+      // fall through
+    }
+  }
+  if (response.status === 400) {
+    return "Invalid input.";
+  }
+  if (response.status === 404) {
+    return "Holding not found.";
+  }
+  return "Request failed. Please try again.";
 }
 
 export async function apiFetch(path, options = {}, retry = true) {

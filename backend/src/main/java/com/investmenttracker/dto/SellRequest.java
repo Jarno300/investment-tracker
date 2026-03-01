@@ -3,10 +3,8 @@ package com.investmenttracker.dto;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-public record BuyRequest(
-    String symbol,
-    String name,
-    String currency,
+public record SellRequest(
+    Long holdingId,
     BigDecimal quantity,
     BigDecimal price,
     BigDecimal costs,

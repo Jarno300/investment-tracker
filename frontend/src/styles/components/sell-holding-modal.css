@@ -1,0 +1,67 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 10, 15, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 20;
+}
+
+.modal {
+  background: #0f141c;
+  border: 1px solid #1f2633;
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.icon-button {
+  background: transparent;
+  border: 1px solid #1f2633;
+  color: #eef2f6;
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.field input {
+  background: #0f141c;
+  border: 1px solid #1f2633;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #eef2f6;
+}
+
+.quote-error {
+  color: #f87171;
+  margin: 0;
+  font-size: 14px;
+}
+
+.sell-modal {
+  width: min(520px, 100%);
+}
+
+.sell-modal .modal-body {
+  display: grid;
+  gap: 12px;
+}
+
+.sell-modal .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}

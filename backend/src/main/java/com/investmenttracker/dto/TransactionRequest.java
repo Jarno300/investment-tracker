@@ -9,6 +9,7 @@ public record TransactionRequest(
     TransactionType type,
     BigDecimal quantity,
     BigDecimal price,
+    BigDecimal costs,
     Instant tradedAt,
     String notes
 ) {

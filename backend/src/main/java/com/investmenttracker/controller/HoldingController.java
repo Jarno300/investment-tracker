@@ -1,12 +1,14 @@
 package com.investmenttracker.controller;
 
 import com.investmenttracker.dto.HoldingRequest;
+import com.investmenttracker.dto.HoldingView;
 import com.investmenttracker.model.Asset;
 import com.investmenttracker.model.Holding;
 import com.investmenttracker.model.UserAccount;
 import com.investmenttracker.repository.AssetRepository;
 import com.investmenttracker.repository.HoldingRepository;
 import com.investmenttracker.service.CurrentUserService;
+import com.investmenttracker.service.HoldingValuationService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -29,19 +31,22 @@ public class HoldingController {
   private final HoldingRepository holdingRepository;
   private final AssetRepository assetRepository;
   private final CurrentUserService currentUserService;
+  private final HoldingValuationService holdingValuationService;
 
   public HoldingController(HoldingRepository holdingRepository,
       AssetRepository assetRepository,
-      CurrentUserService currentUserService) {
+      CurrentUserService currentUserService,
+      HoldingValuationService holdingValuationService) {
     this.holdingRepository = holdingRepository;
     this.assetRepository = assetRepository;
     this.currentUserService = currentUserService;
+    this.holdingValuationService = holdingValuationService;
   }
 
   @GetMapping
-  public List<Holding> getAll() {
+  public List<HoldingView> getAll() {
     UserAccount user = currentUserService.getRequiredUser();
-    return holdingRepository.findByUserId(user.getId());
+    return holdingValuationService.getValuedHoldings(user.getId());
   }
 
   @PostMapping

@@ -42,6 +42,9 @@ public class Transaction {
   @Column(nullable = false, precision = 20, scale = 6)
   private BigDecimal price;
 
+  @Column(precision = 20, scale = 6)
+  private BigDecimal costs = BigDecimal.ZERO;
+
   @Column(nullable = false)
   private Instant tradedAt = Instant.now();
 
@@ -89,6 +92,14 @@ public class Transaction {
 
   public void setPrice(BigDecimal price) {
     this.price = price;
+  }
+
+  public BigDecimal getCosts() {
+    return costs;
+  }
+
+  public void setCosts(BigDecimal costs) {
+    this.costs = costs;
   }
 
   public Instant getTradedAt() {

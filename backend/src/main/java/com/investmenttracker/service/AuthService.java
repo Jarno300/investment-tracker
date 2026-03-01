@@ -8,10 +8,14 @@ import com.investmenttracker.dto.RegisterRequest;
 import com.investmenttracker.dto.UserResponse;
 import com.investmenttracker.model.Role;
 import com.investmenttracker.model.UserAccount;
+import com.investmenttracker.repository.HoldingRepository;
 import com.investmenttracker.repository.UserRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -28,18 +32,29 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class AuthService {
 
+  private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
   private final UserRepository userRepository;
+  private final HoldingRepository holdingRepository;
+  private final StockSearchService stockSearchService;
+  private final StockQuoteCacheService stockQuoteCacheService;
   private final PasswordEncoder passwordEncoder;
   private final JwtEncoder jwtEncoder;
   private final JwtDecoder jwtDecoder;
   private final JwtProperties jwtProperties;
 
   public AuthService(UserRepository userRepository,
+      HoldingRepository holdingRepository,
+      StockSearchService stockSearchService,
+      StockQuoteCacheService stockQuoteCacheService,
       PasswordEncoder passwordEncoder,
       JwtEncoder jwtEncoder,
       JwtDecoder jwtDecoder,
       JwtProperties jwtProperties) {
     this.userRepository = userRepository;
+    this.holdingRepository = holdingRepository;
+    this.stockSearchService = stockSearchService;
+    this.stockQuoteCacheService = stockQuoteCacheService;
     this.passwordEncoder = passwordEncoder;
     this.jwtEncoder = jwtEncoder;
     this.jwtDecoder = jwtDecoder;
@@ -70,6 +85,7 @@ public class AuthService {
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
     }
+    refreshOwnedStockQuotesForToday(user);
     return buildAuthResponse(user);
   }
 
@@ -129,5 +145,20 @@ public class AuthService {
 
   private boolean isBlank(String value) {
     return value == null || value.trim().isEmpty();
+  }
+
+  private void refreshOwnedStockQuotesForToday(UserAccount user) {
+    List<String> symbols = holdingRepository.findDistinctOwnedStockSymbolsByUserId(user.getId());
+    for (String symbol : symbols) {
+      if (stockQuoteCacheService.wasRefreshedToday(symbol)) {
+        continue;
+      }
+      try {
+        stockSearchService.refreshQuote(symbol);
+      } catch (Exception ex) {
+        // Login should not fail because quote refresh failed.
+        log.warn("Failed to refresh quote cache for [{}] on login for user [{}]", symbol, user.getId(), ex);
+      }
+    }
   }
 }

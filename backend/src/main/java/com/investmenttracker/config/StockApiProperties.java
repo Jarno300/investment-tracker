@@ -7,6 +7,7 @@ public class StockApiProperties {
 
   private String apiKey;
   private String baseUrl = "https://www.alphavantage.co/query";
+  private int cacheTtlHours = 24;
 
   public String getApiKey() {
     return apiKey;
@@ -22,5 +23,13 @@ public class StockApiProperties {
 
   public void setBaseUrl(String baseUrl) {
     this.baseUrl = baseUrl;
+  }
+
+  public int getCacheTtlHours() {
+    return cacheTtlHours;
+  }
+
+  public void setCacheTtlHours(int cacheTtlHours) {
+    this.cacheTtlHours = cacheTtlHours;
   }
 }

@@ -7,6 +7,7 @@ import com.investmenttracker.model.UserAccount;
 import com.investmenttracker.repository.AssetRepository;
 import com.investmenttracker.repository.TransactionRepository;
 import com.investmenttracker.service.CurrentUserService;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -67,8 +68,13 @@ public class TransactionController {
     transaction.setType(request.type());
     transaction.setQuantity(request.quantity());
     transaction.setPrice(request.price());
+    transaction.setCosts(defaultValue(request.costs()));
     transaction.setTradedAt(request.tradedAt() == null ? Instant.now() : request.tradedAt());
     transaction.setNotes(request.notes());
     return transactionRepository.save(transaction);
+  }
+
+  private BigDecimal defaultValue(BigDecimal value) {
+    return value == null ? BigDecimal.ZERO : value;
   }
 }
