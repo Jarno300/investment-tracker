@@ -1,5 +1,5 @@
 <template>
-  <div v-if="open && holding" class="modal-backdrop" @click.self="close">
+  <div v-if="open && holding" class="modal-backdrop">
     <div class="modal sell-modal">
       <header class="modal-header">
         <div>

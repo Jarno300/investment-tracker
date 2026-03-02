@@ -36,7 +36,7 @@ export async function register(email, password) {
 export async function searchStocks(query) {
   const response = await apiFetch(`/api/stocks/search?q=${encodeURIComponent(query)}`);
   if (!response.ok) {
-    const message = await readErrorMessage(response);
+    const message = await readApiErrorMessage(response);
     throw new Error(message);
   }
   return response.json();
@@ -65,7 +65,7 @@ export async function getStockQuote(symbol) {
   );
   if (!response.ok) {
     if (response.status === 404) return null;
-    const message = await readErrorMessage(response);
+    const message = await readApiErrorMessage(response);
     throw new Error(message || "Failed to fetch quote");
   }
   const data = await response.json();
@@ -82,7 +82,7 @@ export async function buyStock(payload) {
     body: JSON.stringify(payload)
   });
   if (!response.ok) {
-    const message = await readErrorMessage(response);
+    const message = await readApiErrorMessage(response);
     throw new Error(message);
   }
   return response.json();
@@ -152,6 +152,8 @@ async function readApiErrorMessage(response) {
     try {
       const data = await response.json();
       if (data?.message) return data.message;
+      if (data?.detail) return data.detail;
+      if (data?.title) return data.title;
       if (data?.error) return data.error;
     } catch {
       // fall through
@@ -162,6 +164,9 @@ async function readApiErrorMessage(response) {
   }
   if (response.status === 404) {
     return "Holding not found.";
+  }
+  if (response.status === 503) {
+    return "Service temporarily unavailable. Check API key and rate limits.";
   }
   return "Request failed. Please try again.";
 }
@@ -175,10 +180,15 @@ export async function apiFetch(path, options = {}, retry = true) {
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    throw new Error("Unable to reach backend server. It may be restarting.");
+  }
   if (response.status === 401 && retry) {
     const refreshed = await refreshTokens();
     if (refreshed) {

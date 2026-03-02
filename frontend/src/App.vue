@@ -1,6 +1,10 @@
 <template>
   <div class="app-shell">
     <aside v-if="isAuthenticated" class="sidebar">
+      <div class="sidebar-user">
+        <p class="sidebar-user-label">Signed in as</p>
+        <p class="sidebar-user-email">{{ userEmail }}</p>
+      </div>
       <button
         type="button"
         class="nav-button"
@@ -16,6 +20,14 @@
         @click="viewMode = 'holdings'"
       >
         Holdings
+      </button>
+      <button
+        type="button"
+        class="nav-button refresh-account-button"
+        :disabled="refreshingAccount"
+        @click="refreshAccount"
+      >
+        {{ refreshingAccount ? "Refreshing..." : "Refresh Account" }}
       </button>
     </aside>
 
@@ -40,24 +52,40 @@
         @submit="handleAuth"
       />
 
-      <SummaryCards
+      <div
         v-if="isAuthenticated && viewMode === 'dashboard'"
-        :summary="summary"
-        :total-value="totalValueDisplay"
-        :asset-type-breakdown="assetTypeBreakdown"
-        :holdings="holdings"
-        :format-type="formatType"
-      />
-
-      <section v-if="isAuthenticated && viewMode === 'dashboard'" class="grid">
-        <AssetTypePanel :items="assetTypeBreakdown" :format-type="formatType" />
-        <HoldingsPanel
+        class="dashboard-content"
+      >
+        <SummaryCards
+          :summary="summary"
+          :total-value="profitLossDisplay"
+          :asset-type-breakdown="assetTypeBreakdown"
           :holdings="holdings"
+          :transactions="transactions"
+          :format-type="formatType"
           :format-currency="formatCurrency"
-          @sell="openSellModal"
         />
-        <ActivityPanel :transactions="transactions" :format-date="formatDate" />
-      </section>
+
+        <section class="grid dashboard-grid">
+          <HoldingsPanel
+            class="holdings-panel-wide"
+            :holdings="holdings"
+            :format-currency="formatCurrency"
+            @sell="openSellModal"
+          />
+          <AssetTypePanel
+            class="asset-type-panel-third"
+            :items="assetTypeBreakdown"
+            :format-type="formatType"
+          />
+          <ActivityPanel
+            class="activity-panel-two-thirds"
+            :transactions="recentTransactions"
+            :format-date="formatDate"
+            :format-currency="formatCurrency"
+          />
+        </section>
+      </div>
 
       <section
         v-if="isAuthenticated && viewMode === 'holdings'"
@@ -104,7 +132,13 @@ import {
   setTokens,
 } from "./api";
 
-const summary = ref({ totalValue: 0, holdingsCount: 0, assetsCount: 0 });
+const summary = ref({
+  totalValue: 0,
+  portfolioValue: 0,
+  profitLoss: 0,
+  holdingsCount: 0,
+  assetsCount: 0,
+});
 const assets = ref([]);
 const holdings = ref([]);
 const transactions = ref([]);
@@ -123,9 +157,12 @@ const viewMode = ref("dashboard");
 const showAddAsset = ref(false);
 const showSellModal = ref(false);
 const selectedHolding = ref(null);
+const refreshingAccount = ref(false);
 
-const totalValueDisplay = computed(() =>
-  formatCurrency(summary.value.totalValue),
+const userEmail = computed(() => user.value?.email || "Unknown user");
+
+const profitLossDisplay = computed(() =>
+  formatCurrency(summary.value.profitLoss),
 );
 
 const assetTypeBreakdown = computed(() => {
@@ -136,6 +173,8 @@ const assetTypeBreakdown = computed(() => {
   }, {});
   return Object.entries(counts).map(([type, count]) => ({ type, count }));
 });
+
+const recentTransactions = computed(() => transactions.value.slice(0, 5));
 
 onMounted(() => {
   if (isAuthenticated.value) {
@@ -157,7 +196,7 @@ async function loadDashboard() {
     summary.value = summaryData;
     assets.value = assetsData;
     holdings.value = holdingsData;
-    transactions.value = transactionsData.slice(0, 5);
+    transactions.value = transactionsData;
   } catch (err) {
     if (err.status === 401) {
       logout();
@@ -195,7 +234,13 @@ function logout() {
   accessToken.value = "";
   viewMode.value = "dashboard";
   user.value = null;
-  summary.value = { totalValue: 0, holdingsCount: 0, assetsCount: 0 };
+  summary.value = {
+    totalValue: 0,
+    portfolioValue: 0,
+    profitLoss: 0,
+    holdingsCount: 0,
+    assetsCount: 0,
+  };
   assets.value = [];
   holdings.value = [];
   transactions.value = [];
@@ -227,6 +272,35 @@ function closeSellModal() {
 
 async function handleHoldingSold() {
   await loadDashboard();
+}
+
+async function refreshAccount() {
+  if (refreshingAccount.value) return;
+  const confirmed = window.confirm(
+    "This will remove assets, holdings, and transactions for your account. Continue?",
+  );
+  if (!confirmed) return;
+  refreshingAccount.value = true;
+  error.value = "";
+  try {
+    const response = await apiFetch("/api/account/refresh", { method: "POST" });
+    if (!response.ok) {
+      const err = new Error("Failed to refresh account data.");
+      err.status = response.status;
+      throw err;
+    }
+    showSellModal.value = false;
+    selectedHolding.value = null;
+    await loadDashboard();
+  } catch (err) {
+    if (err.status === 401) {
+      logout();
+      return;
+    }
+    error.value = err.message || "Failed to refresh account data.";
+  } finally {
+    refreshingAccount.value = false;
+  }
 }
 
 async function fetchJson(path) {
@@ -270,11 +344,33 @@ function formatDate(value) {
 <style scoped>
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .page {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 147, 166, 0.35) transparent;
+}
+
+.page::-webkit-scrollbar {
+  width: 8px;
+}
+
+.page::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page::-webkit-scrollbar-thumb {
+  background: rgba(138, 147, 166, 0.35);
+  border-radius: 999px;
+}
+
+.page::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 147, 166, 0.55);
 }
 
 .sidebar {
@@ -282,12 +378,38 @@ function formatDate(value) {
   border-right: 1px solid #1f2633;
   background: #0f141c;
   padding: 24px 12px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-content: start;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.sidebar-user {
+  border: 1px solid #1f2633;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #151a22;
+  margin-bottom: 2px;
+}
+
+.sidebar-user-label {
+  margin: 0 0 4px;
+  color: #8a93a6;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sidebar-user-email {
+  margin: 0;
+  color: #eef2f6;
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
 }
 
 .nav-button {
@@ -306,7 +428,51 @@ function formatDate(value) {
   background: rgba(79, 70, 229, 0.18);
 }
 
+.refresh-account-button {
+  margin-top: auto;
+  border-color: #7f1d1d;
+  background: rgba(127, 29, 29, 0.25);
+}
+
+.refresh-account-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .holdings-focus {
   display: block;
+}
+
+.holdings-panel-wide {
+  grid-column: 1 / -1;
+}
+
+.dashboard-content {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.asset-type-panel-third {
+  grid-column: span 1;
+}
+
+.activity-panel-two-thirds {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-type-panel-third,
+  .activity-panel-two-thirds,
+  .holdings-panel-wide {
+    grid-column: 1 / -1;
+  }
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div v-if="open" class="modal-backdrop" @click.self="close">
+  <div v-if="open" class="modal-backdrop">
     <div class="modal">
       <header class="modal-header">
         <div>
@@ -132,8 +132,6 @@ const currentQuote = ref(null);
 const quoteLoading = ref(false);
 const quoteError = ref("");
 
-let debounceTimer;
-
 watch(
   () => props.open,
   () => {
@@ -144,13 +142,10 @@ watch(
 );
 
 watch(query, () => {
-  clearTimeout(debounceTimer);
   if (!query.value) {
     results.value = [];
     selected.value = null;
-    return;
   }
-  debounceTimer = setTimeout(runSearch, 400);
 });
 
 watch(

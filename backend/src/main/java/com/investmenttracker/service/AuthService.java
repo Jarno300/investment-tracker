@@ -33,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthService {
 
   private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+  private static final int MAX_QUOTES_REFRESH_PER_LOGIN = 3;
 
   private final UserRepository userRepository;
   private final HoldingRepository holdingRepository;
@@ -149,12 +150,17 @@ public class AuthService {
 
   private void refreshOwnedStockQuotesForToday(UserAccount user) {
     List<String> symbols = holdingRepository.findDistinctOwnedStockSymbolsByUserId(user.getId());
+    int refreshed = 0;
     for (String symbol : symbols) {
+      if (refreshed >= MAX_QUOTES_REFRESH_PER_LOGIN) {
+        break;
+      }
       if (stockQuoteCacheService.wasRefreshedToday(symbol)) {
         continue;
       }
       try {
         stockSearchService.refreshQuote(symbol);
+        refreshed++;
       } catch (Exception ex) {
         // Login should not fail because quote refresh failed.
         log.warn("Failed to refresh quote cache for [{}] on login for user [{}]", symbol, user.getId(), ex);

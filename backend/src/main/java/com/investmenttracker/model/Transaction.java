@@ -45,6 +45,12 @@ public class Transaction {
   @Column(precision = 20, scale = 6)
   private BigDecimal costs = BigDecimal.ZERO;
 
+  @Column(precision = 20, scale = 6)
+  private BigDecimal profitLossAmount;
+
+  @Column(precision = 10, scale = 4)
+  private BigDecimal profitLossPercent;
+
   @Column(nullable = false)
   private Instant tradedAt = Instant.now();
 
@@ -100,6 +106,22 @@ public class Transaction {
 
   public void setCosts(BigDecimal costs) {
     this.costs = costs;
+  }
+
+  public BigDecimal getProfitLossAmount() {
+    return profitLossAmount;
+  }
+
+  public void setProfitLossAmount(BigDecimal profitLossAmount) {
+    this.profitLossAmount = profitLossAmount;
+  }
+
+  public BigDecimal getProfitLossPercent() {
+    return profitLossPercent;
+  }
+
+  public void setProfitLossPercent(BigDecimal profitLossPercent) {
+    this.profitLossPercent = profitLossPercent;
   }
 
   public Instant getTradedAt() {

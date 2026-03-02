@@ -104,6 +104,8 @@ public class PortfolioController {
     transaction.setQuantity(request.quantity());
     transaction.setPrice(request.price());
     transaction.setCosts(tradeCosts);
+    transaction.setProfitLossAmount(null);
+    transaction.setProfitLossPercent(null);
     transaction.setTradedAt(request.tradedAt() == null ? Instant.now() : request.tradedAt());
     transactionRepository.save(transaction);
 
@@ -129,13 +131,23 @@ public class PortfolioController {
     if (request.quantity().compareTo(ownedQuantity) > 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sell quantity cannot exceed owned quantity");
     }
+    BigDecimal averageCost = holding.getAverageCost() == null ? BigDecimal.ZERO : holding.getAverageCost();
+    BigDecimal sellCosts = defaultValue(request.costs());
+    BigDecimal grossProceeds = request.price().multiply(request.quantity());
+    BigDecimal costBasis = averageCost.multiply(request.quantity()).add(sellCosts);
+    BigDecimal profitLossAmount = grossProceeds.subtract(costBasis);
+    BigDecimal profitLossPercent = null;
+    if (costBasis.compareTo(BigDecimal.ZERO) > 0) {
+      profitLossPercent = profitLossAmount
+          .multiply(BigDecimal.valueOf(100))
+          .divide(costBasis, 4, RoundingMode.HALF_UP);
+    }
 
     BigDecimal remainingQuantity = ownedQuantity.subtract(request.quantity());
     if (remainingQuantity.compareTo(BigDecimal.ZERO) == 0) {
       holdingRepository.delete(holding);
     } else {
       holding.setQuantity(remainingQuantity);
-      BigDecimal averageCost = holding.getAverageCost() == null ? BigDecimal.ZERO : holding.getAverageCost();
       holding.setMarketValue(remainingQuantity.multiply(averageCost));
       holding.setUpdatedAt(Instant.now());
       holdingRepository.save(holding);
@@ -147,7 +159,9 @@ public class PortfolioController {
     transaction.setType(TransactionType.SELL);
     transaction.setQuantity(request.quantity());
     transaction.setPrice(request.price());
-    transaction.setCosts(defaultValue(request.costs()));
+    transaction.setCosts(sellCosts);
+    transaction.setProfitLossAmount(profitLossAmount);
+    transaction.setProfitLossPercent(profitLossPercent);
     transaction.setTradedAt(request.tradedAt() == null ? Instant.now() : request.tradedAt());
     transactionRepository.save(transaction);
 

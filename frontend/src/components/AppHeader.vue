@@ -1,9 +1,7 @@
 <template>
   <header class="header">
     <div>
-      <p class="eyebrow">Portfolio dashboard</p>
-      <h1>Investment Tracker</h1>
-      <p class="muted" v-if="user">Signed in as {{ user.email }}</p>
+      <p class="eyebrow">Investment tracker</p>
       <p class="muted" v-if="error">{{ error }}</p>
       <p class="muted" v-if="loading && isAuthenticated">Loading data...</p>
     </div>
@@ -16,10 +14,19 @@
       >
         {{ authMode === "login" ? "Create account" : "Have an account?" }}
       </button>
-      <button v-if="isAuthenticated" class="action secondary" type="button" @click="$emit('logout')">
+      <button
+        v-if="isAuthenticated"
+        class="action secondary"
+        type="button"
+        @click="$emit('logout')"
+      >
         Log out
       </button>
-      <button class="action" :disabled="!isAuthenticated" @click="$emit('add-asset')">
+      <button
+        class="action"
+        :disabled="!isAuthenticated"
+        @click="$emit('add-asset')"
+      >
         Add asset
       </button>
     </div>
@@ -30,24 +37,24 @@
 defineProps({
   user: {
     type: Object,
-    default: null
+    default: null,
   },
   error: {
     type: String,
-    default: ""
+    default: "",
   },
   loading: {
     type: Boolean,
-    default: false
+    default: false,
   },
   isAuthenticated: {
     type: Boolean,
-    default: false
+    default: false,
   },
   authMode: {
     type: String,
-    default: "login"
-  }
+    default: "login",
+  },
 });
 
 defineEmits(["toggle-auth-mode", "logout", "add-asset"]);

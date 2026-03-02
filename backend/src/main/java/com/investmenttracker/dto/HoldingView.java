@@ -9,6 +9,9 @@ public record HoldingView(
     BigDecimal quantity,
     BigDecimal marketValue,
     BigDecimal currentValue,
+    BigDecimal totalCosts,
+    BigDecimal totalInvestment,
+    BigDecimal profitLossPercent,
     Instant updatedAt
 ) {
   public record AssetView(

@@ -6,7 +6,9 @@ import com.investmenttracker.model.Holding;
 import com.investmenttracker.model.StockQuoteCacheEntry;
 import com.investmenttracker.repository.HoldingRepository;
 import com.investmenttracker.repository.StockQuoteCacheRepository;
+import com.investmenttracker.repository.TransactionRepository;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,13 +22,16 @@ public class HoldingValuationService {
 
   private final HoldingRepository holdingRepository;
   private final StockQuoteCacheRepository stockQuoteCacheRepository;
+  private final TransactionRepository transactionRepository;
   private final StockSearchService stockSearchService;
 
   public HoldingValuationService(HoldingRepository holdingRepository,
       StockQuoteCacheRepository stockQuoteCacheRepository,
+      TransactionRepository transactionRepository,
       StockSearchService stockSearchService) {
     this.holdingRepository = holdingRepository;
     this.stockQuoteCacheRepository = stockQuoteCacheRepository;
+    this.transactionRepository = transactionRepository;
     this.stockSearchService = stockSearchService;
   }
 
@@ -66,16 +71,30 @@ public class HoldingValuationService {
               (first, second) -> first));
     }
     final Map<String, StockQuoteCacheEntry> finalQuoteBySymbol = quoteBySymbol;
+    final Map<Long, BigDecimal> totalCostsByAssetId = transactionRepository.findByUserIdOrderByTradedAtDesc(userId)
+        .stream()
+        .filter(tx -> tx.getAsset() != null && tx.getAsset().getId() != null)
+        .collect(Collectors.toMap(
+            tx -> tx.getAsset().getId(),
+            tx -> defaultDecimal(tx.getCosts()),
+            BigDecimal::add));
 
     return holdings.stream()
-        .map(holding -> toView(holding, finalQuoteBySymbol))
+        .map(holding -> toView(holding, finalQuoteBySymbol, totalCostsByAssetId))
         .toList();
   }
 
-  private HoldingView toView(Holding holding, Map<String, StockQuoteCacheEntry> quoteBySymbol) {
+  private HoldingView toView(Holding holding,
+      Map<String, StockQuoteCacheEntry> quoteBySymbol,
+      Map<Long, BigDecimal> totalCostsByAssetId) {
     BigDecimal quantity = defaultDecimal(holding.getQuantity());
     BigDecimal investmentValue = defaultDecimal(holding.getMarketValue());
     BigDecimal currentValue = investmentValue;
+    BigDecimal totalCosts = holding.getAsset() == null || holding.getAsset().getId() == null
+        ? BigDecimal.ZERO
+        : defaultDecimal(totalCostsByAssetId.get(holding.getAsset().getId()));
+    BigDecimal totalInvestment = investmentValue.add(totalCosts);
+    BigDecimal profitLossPercent = null;
 
     if (holding.getAsset() != null && holding.getAsset().getType() == AssetType.STOCK) {
       String symbol = normalize(holding.getAsset().getSymbol());
@@ -83,6 +102,12 @@ public class HoldingValuationService {
       if (quote != null && quote.getPrice() != null) {
         currentValue = quote.getPrice().multiply(quantity);
       }
+    }
+    if (totalInvestment.compareTo(BigDecimal.ZERO) > 0) {
+      profitLossPercent = currentValue
+          .subtract(totalInvestment)
+          .multiply(BigDecimal.valueOf(100))
+          .divide(totalInvestment, 4, RoundingMode.HALF_UP);
     }
 
     HoldingView.AssetView assetView = null;
@@ -101,6 +126,9 @@ public class HoldingValuationService {
         quantity,
         investmentValue,
         currentValue,
+        totalCosts,
+        totalInvestment,
+        profitLossPercent,
         holding.getUpdatedAt());
   }
 

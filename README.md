@@ -33,3 +33,7 @@ Invoke-RestMethod -Method Get -Uri http://localhost:8080/api/summary `
 - JWT secret is configured via `JWT_SECRET` (must be at least 32 characters).
 - Access token defaults to 15 minutes; refresh token defaults to 30 days.
 - Stock search uses Alpha Vantage; set `STOCK_API_KEY` in `.env`.
+
+## Next steps:
+
+- Bypass free tier: hardcode 25 symbols to track, refresh daily

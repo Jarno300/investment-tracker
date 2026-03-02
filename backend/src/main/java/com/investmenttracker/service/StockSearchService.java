@@ -48,6 +48,20 @@ public class StockSearchService {
         .toUriString();
     AlphaVantageSearchResponse response =
         restTemplate.getForObject(url, AlphaVantageSearchResponse.class);
+    if (response != null) {
+      String errorMsg = response.getNote();
+      if (errorMsg == null || errorMsg.isBlank()) {
+        errorMsg = response.getErrorMessage();
+      }
+      if (errorMsg == null || errorMsg.isBlank()) {
+        errorMsg = response.getInformation();
+      }
+      if (errorMsg != null && !errorMsg.isBlank()) {
+        throw new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Stock search service: " + errorMsg.replaceAll("<[^>]+>", "").trim());
+      }
+    }
     List<AlphaVantageSearchResponse.AlphaVantageMatch> matches =
         Optional.ofNullable(response)
             .map(AlphaVantageSearchResponse::getBestMatches)

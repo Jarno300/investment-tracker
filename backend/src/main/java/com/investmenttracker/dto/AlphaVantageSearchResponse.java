@@ -7,6 +7,12 @@ public class AlphaVantageSearchResponse {
 
   @JsonProperty("bestMatches")
   private List<AlphaVantageMatch> bestMatches;
+  @JsonProperty("Note")
+  private String note;
+  @JsonProperty("Information")
+  private String information;
+  @JsonProperty("Error Message")
+  private String errorMessage;
 
   public List<AlphaVantageMatch> getBestMatches() {
     return bestMatches;
@@ -14,6 +20,30 @@ public class AlphaVantageSearchResponse {
 
   public void setBestMatches(List<AlphaVantageMatch> bestMatches) {
     this.bestMatches = bestMatches;
+  }
+
+  public String getNote() {
+    return note;
+  }
+
+  public void setNote(String note) {
+    this.note = note;
+  }
+
+  public String getInformation() {
+    return information;
+  }
+
+  public void setInformation(String information) {
+    this.information = information;
+  }
+
+  public String getErrorMessage() {
+    return errorMessage;
+  }
+
+  public void setErrorMessage(String errorMessage) {
+    this.errorMessage = errorMessage;
   }
 
   public static class AlphaVantageMatch {

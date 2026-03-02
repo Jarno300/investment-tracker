@@ -12,6 +12,7 @@ public interface HoldingRepository extends JpaRepository<Holding, Long> {
   Optional<Holding> findByUserIdAndAssetId(Long userId, Long assetId);
   Optional<Holding> findByIdAndUserId(Long id, Long userId);
   long countByUserId(Long userId);
+  void deleteByUserId(Long userId);
 
   @Query("""
       select distinct upper(trim(a.symbol))
