@@ -19,10 +19,18 @@ public class CurrentUserService {
 
   public UserAccount getRequiredUser() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication.getName() == null) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+    if (authentication == null || !authentication.isAuthenticated()) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
     }
-    return userRepository.findByEmailIgnoreCase(authentication.getName())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+    String email = authentication.getName();
+    if (email == null || email.isBlank() || "anonymousUser".equalsIgnoreCase(email)) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+    }
+
+    return userRepository
+        .findByEmailIgnoreCase(email)
+        .orElseThrow(
+            () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found for token"));
   }
 }

@@ -59,7 +59,6 @@ services:
       SPRING_DATASOURCE_PASSWORD: investment
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       JWT_SECRET: ${JWT_SECRET}
-      STOCK_API_KEY: ${STOCK_API_KEY}
     ports:
       - "8080:8080"
     depends_on:
