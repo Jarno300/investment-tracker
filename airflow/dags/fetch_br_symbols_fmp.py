@@ -57,6 +57,7 @@ def fetch_and_store_symbols(**context) -> None:
     now = datetime.now(timezone.utc)
     
     records_to_insert = []
+    bond_filter_keywords = ["Bond", "Note", "Government","Kingdom", "Certificate", "OLO"]
     
     # Loop through the data and format it for Yahoo Finance
     for item in exchange_data:
@@ -64,15 +65,16 @@ def fetch_and_store_symbols(**context) -> None:
         if item.get("type") == "Common Stock":
             base_symbol = item.get("symbol")
             company_name = item.get("name", "Unknown")
-            
+            is_bond = any(keyword in company_name.lower() for keyword in bond_filter_keywords)
             # CRITICAL: Append .BR so Yahoo Finance can read it tomorrow
             yf_symbol = f"{base_symbol}.BR"
-            
+                
             records_to_insert.append((
                 yf_symbol,
                 company_name,
-                "Brussels",
-                now
+                "BR",
+                now,
+                is_bond
             ))
 
     if not records_to_insert:
@@ -84,11 +86,12 @@ def fetch_and_store_symbols(**context) -> None:
     conn = psycopg2.connect(**conn_params)
     
     insert_query = """
-        INSERT INTO exchange_symbols (symbol, company_name, exchange, last_updated)
+        INSERT INTO exchange_symbols (symbol, company_name, exchange, last_updated, is_bond)
         VALUES %s
         ON CONFLICT (symbol) DO UPDATE SET 
             company_name = EXCLUDED.company_name,
-            last_updated = EXCLUDED.last_updated;
+            last_updated = EXCLUDED.last_updated,
+            is_bond = EXCLUDED.is_bond;
     """
 
     try:
