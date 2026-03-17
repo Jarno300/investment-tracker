@@ -1,4 +1,42 @@
 services:
+  airflow-db:
+    image: postgres:16
+    container_name: investment-tracker-airflow-db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+  airflow:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    image: investment-tracker-airflow:2.10.2
+    container_name: investment-tracker-airflow
+    env_file:
+      - ./airflow/.env
+    depends_on:
+      - airflow-db
+      - db
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: "6f9c1a2e3b854f7ca1d9e4f02c8b7d13"
+      AIRFLOW__WEBSERVER__SECRET_KEY: "c4e71f98a2d343e6b7f10d4c89a2f6b5"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      INVESTMENT_DB_URL: postgresql://investment:investment@db:5432/investment_tracker
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    ports:
+      - "8081:8080" # Airflow web UI on localhost:8081
+    command: >
+      bash -c "airflow db upgrade &&
+              airflow users create --username admin --password admin
+              --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+              airflow webserver & airflow scheduler"
   db:
     image: postgres:16
     container_name: investment-tracker-db
@@ -33,7 +71,7 @@ services:
     container_name: investment-tracker-frontend
     volumes:
       - ./frontend:/app
-      - /app/node_modules  # preserve container node_modules
+      - /app/node_modules # preserve container node_modules
     ports:
       - "5173:5173"
     depends_on:
@@ -41,3 +79,4 @@ services:
 
 volumes:
   db_data:
+  airflow_db_data:
