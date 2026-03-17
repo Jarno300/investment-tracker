@@ -46,8 +46,10 @@ def fetch_and_cache_belgian_stocks(**context) -> None:
     # 1. Fetch the dynamic list of symbols from your database
     try:
         with conn.cursor() as cur:
-            # We filter by 'Brussels' just in case you add US or other markets later
-            cur.execute("SELECT symbol FROM exchange_symbols WHERE exchange = 'Brussels';")
+            # Support both legacy "Brussels" and normalized "BR" exchange values.
+            cur.execute(
+                "SELECT symbol FROM exchange_symbols WHERE exchange IN ('Brussels', 'BR');"
+            )
             # Flatten the list of tuples returned by fetchall()
             db_symbols = [row[0] for row in cur.fetchall()]
     except Exception as e:

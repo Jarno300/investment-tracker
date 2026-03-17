@@ -19,6 +19,7 @@ services:
     depends_on:
       - airflow-db
       - db
+      - redis
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
@@ -26,6 +27,7 @@ services:
       AIRFLOW__WEBSERVER__SECRET_KEY: "c4e71f98a2d343e6b7f10d4c89a2f6b5"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       INVESTMENT_DB_URL: postgresql://investment:investment@db:5432/investment_tracker
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
@@ -49,6 +51,12 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: investment-tracker-redis
+    ports:
+      - "6379:6379"
+
   backend:
     build:
       context: ./backend
@@ -58,11 +66,14 @@ services:
       SPRING_DATASOURCE_USERNAME: investment
       SPRING_DATASOURCE_PASSWORD: investment
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
     ports:
       - "8080:8080"
     depends_on:
       - db
+      - redis
 
   frontend:
     build:
