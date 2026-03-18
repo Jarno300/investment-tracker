@@ -34,12 +34,17 @@ export async function register(email, password) {
 }
 
 export async function searchStocks(query) {
-  const response = await apiFetch(`/api/stocks/search?q=${encodeURIComponent(query)}`);
+  const response = await apiFetch(
+    `/api/stocks/search?q=${encodeURIComponent(query)}`,
+  );
   if (!response.ok) {
     const message = await readApiErrorMessage(response);
     throw new Error(message);
   }
-  return response.json();
+  const data = await response.json();
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.value)) return data.value;
+  return [];
 }
 
 const STOCK_QUOTE_CACHE_PREFIX = "stock_quote_";
@@ -51,7 +56,8 @@ export async function getStockQuote(symbol) {
   if (cached) {
     try {
       const { data, fetchedAt } = JSON.parse(cached);
-      const hasValidPrice = data?.price != null && !Number.isNaN(Number(data.price));
+      const hasValidPrice =
+        data?.price != null && !Number.isNaN(Number(data.price));
       if (Date.now() - fetchedAt < STOCK_QUOTE_CACHE_MS && hasValidPrice) {
         return data;
       }
@@ -61,7 +67,7 @@ export async function getStockQuote(symbol) {
   }
 
   const response = await apiFetch(
-    `/api/stocks/quote?symbol=${encodeURIComponent(symbol)}`
+    `/api/stocks/quote?symbol=${encodeURIComponent(symbol)}`,
   );
   if (!response.ok) {
     if (response.status === 404) return null;
@@ -71,7 +77,7 @@ export async function getStockQuote(symbol) {
   const data = await response.json();
   localStorage.setItem(
     cacheKey,
-    JSON.stringify({ data, fetchedAt: Date.now() })
+    JSON.stringify({ data, fetchedAt: Date.now() }),
   );
   return data;
 }
@@ -79,7 +85,7 @@ export async function getStockQuote(symbol) {
 export async function buyStock(payload) {
   const response = await apiFetch("/api/portfolio/buy", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     const message = await readApiErrorMessage(response);

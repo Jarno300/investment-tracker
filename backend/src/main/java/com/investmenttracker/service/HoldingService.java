@@ -1,13 +1,16 @@
 package com.investmenttracker.service;
 
 import com.investmenttracker.dto.HoldingRequest;
-import com.investmenttracker.model.Asset;
 import com.investmenttracker.model.Holding;
+import com.investmenttracker.dto.StockQuoteResult;
+import com.investmenttracker.model.Asset;
 import com.investmenttracker.repository.AssetRepository;
 import com.investmenttracker.repository.HoldingRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,25 +21,34 @@ public class HoldingService {
   private final HoldingRepository holdingRepository;
   private final AssetRepository assetRepository;
   private final CurrentUserService currentUserService;
+  private final StockReadService stockReadService;
 
   public HoldingService(
       HoldingRepository holdingRepository,
       AssetRepository assetRepository,
-      CurrentUserService currentUserService) {
+      CurrentUserService currentUserService,
+      StockReadService stockReadService) {
     this.holdingRepository = holdingRepository;
     this.assetRepository = assetRepository;
     this.currentUserService = currentUserService;
+    this.stockReadService = stockReadService;
   }
 
   public List<Holding> getAll() {
     Long userId = currentUserService.getRequiredUser().getId();
-    return holdingRepository.findByUserId(userId);
+    List<Holding> holdings = holdingRepository.findByUserId(userId);
+    return enrichMarketValues(holdings);
   }
 
   public Holding getById(Long id) {
     Long userId = currentUserService.getRequiredUser().getId();
     return holdingRepository
         .findByIdAndUserId(id, userId)
+        .map(
+            h -> {
+              enrichMarketValuesInPlace(List.of(h));
+              return h;
+            })
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holding not found"));
   }
 
@@ -97,6 +109,28 @@ public class HoldingService {
   public void delete(Long id) {
     Holding holding = getById(id);
     holdingRepository.delete(holding);
+  }
+
+  private List<Holding> enrichMarketValues(List<Holding> holdings) {
+    if (holdings == null || holdings.isEmpty()) return holdings;
+    // Copy to avoid mutating JPA-managed collection unexpectedly for callers.
+    List<Holding> enriched = new ArrayList<>(holdings);
+    enrichMarketValuesInPlace(enriched);
+    return enriched;
+  }
+
+  private void enrichMarketValuesInPlace(List<Holding> holdings) {
+    for (Holding holding : holdings) {
+      if (holding == null || holding.getAsset() == null) continue;
+      String symbol = holding.getAsset().getSymbol();
+      if (symbol == null || symbol.trim().isEmpty()) continue;
+
+      Optional<StockQuoteResult> quoteOpt = stockReadService.getQuote(symbol);
+      if (quoteOpt.isPresent() && quoteOpt.get().price() != null) {
+        BigDecimal qty = holding.getQuantity() == null ? BigDecimal.ZERO : holding.getQuantity();
+        holding.setMarketValue(quoteOpt.get().price().multiply(qty));
+      }
+    }
   }
 
   private static BigDecimal defaultValue(BigDecimal value) {

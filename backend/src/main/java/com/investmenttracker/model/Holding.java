@@ -93,4 +93,32 @@ public class Holding {
   public void setUpdatedAt(Instant updatedAt) {
     this.updatedAt = updatedAt;
   }
+
+  // --- Derived fields for frontend convenience ---
+  // The frontend expects these fields even though they are not persisted columns.
+
+  public BigDecimal getCurrentValue() {
+    return getMarketValue();
+  }
+
+  public BigDecimal getTotalInvestment() {
+    return getAverageCost().multiply(getQuantity());
+  }
+
+  public BigDecimal getTotalCosts() {
+    // We don't currently store transaction costs aggregated per holding.
+    // (Costs are stored per transaction.) Default to 0 for UI consistency.
+    return BigDecimal.ZERO;
+  }
+
+  public BigDecimal getProfitLossPercent() {
+    BigDecimal totalInvestment = getTotalInvestment();
+    if (totalInvestment == null || totalInvestment.compareTo(BigDecimal.ZERO) == 0) {
+      return BigDecimal.ZERO;
+    }
+
+    BigDecimal profitLoss = getCurrentValue().subtract(totalInvestment);
+    return profitLoss.divide(totalInvestment, 10, java.math.RoundingMode.HALF_UP)
+        .multiply(BigDecimal.valueOf(100));
+  }
 }
